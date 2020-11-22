@@ -1,0 +1,475 @@
+---
+title: "Final Project"
+author: "Ryan Gough"
+date: '2020-11-16'
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+
+```{r, echo=FALSE}
+setwd("/Users/ryangough/Documents/Github")
+library(readxl)
+library(ggplot2)
+library(leaps)
+library(pastecs)
+library(lm.beta)
+library(car)
+library(olsrr)
+library(tidyverse)
+library(broom)
+library(ggfortify)
+library(gmodels)
+library(class)
+library(dplyr)
+library(tidyr)
+library(psych)
+library(pastecs)
+library(knitr)
+library(yaml)
+library(rmarkdown)
+library(Hmisc)
+library(MASS)
+library(ppcor)
+library(foreign)
+
+Quant_22RV1 <- read.csv("/Users/ryangough/Documents/GitHub/dsc520/data/22RV1_Quantification_AP_KNN.csv", header = TRUE)
+
+Quant_22RV1_Cleaned <- read.csv("/Users/ryangough/Documents/GitHub/dsc520/data/filtered_22Rv1.csv", header = TRUE)
+
+Quant_22RV1_Cleanedvs2 <- read.csv("/Users/ryangough/Documents/GitHub/dsc520/data/filtered_22Rv1vs2.csv", header = TRUE)
+
+Alcoholic <- read.csv("/Users/ryangough/Documents/GitHub/dsc520/data/Alcoholic Mice S1P and GCC185.csv", header = TRUE)
+
+Alcoholic_filtered <- read.csv("/Users/ryangough/Documents/GitHub/dsc520/data/filtered_alcoholic.csv", header = TRUE)
+```
+
+```{r, echo=FALSE}
+
+# Quantification of 22RV1 cell lines Control and ATF6 KD, stained for Green-ATF6 and Red-AR.
+
+# Scatterplot of ATF6 and AR Distribution of cleaned data. 
+ggplot(Quant_22RV1_Cleaned, aes(y=Red.AR, x=Green.ATF6)) +
+  geom_point() +
+  ggtitle("ATF6 & AR Distribution")
+
+# Assessing normality of ATF6 and AR. 
+shapiro.test(Quant_22RV1_Cleaned$Green.ATF6) # TLDR, Not Normal, p-value = 3.609e-05
+shapiro.test(Quant_22RV1_Cleaned$Red.AR) # TLDR, Not Normal, p-value = 2.651e-05
+
+
+#KNN of ATF6 and AR Distribution of cleaned data
+binary_cleaned_22rv1.dat <- sample(1:nrow(Quant_22RV1_Cleaned),size=nrow(Quant_22RV1_Cleaned)*0.7,replace = FALSE) # Splitting Data
+
+train <- Quant_22RV1_Cleaned[binary_cleaned_22rv1.dat,] # Training Data @ 70%
+
+test<- Quant_22RV1_Cleaned[-binary_cleaned_22rv1.dat,] # Testing remaining Data at 30%
+
+train.labels <- Quant_22RV1_Cleaned[binary_cleaned_22rv1.dat,1]
+
+test.labels  <- Quant_22RV1_Cleaned[-binary_cleaned_22rv1.dat,1]
+
+k = 2
+
+model =  knn(train=train, test=test, cl=train.labels, k=k)
+
+
+tab.1 <- table(model, test.labels) # Confusion Matrix
+
+accuracy <- function(x){sum(diag(x)/(sum(rowSums(x)))) * 100} # Function divides the correct predictions by total number of predictions.
+accuracy(tab.1) # KNN method, 53.98551
+
+
+#
+the_data = read.csv("/Users/ryangough/Documents/GitHub/dsc520/data/22RV1_Quantification_AP_KNN.csv")
+
+lr_model <- glm(Quant_22RV1_Cleaned$Cell.Type ~.,
+                family = "binomial",
+                data = Quant_22RV1_Cleaned)
+
+summary(the_data)
+
+pred_model <- predict(lr_model, Quant_22RV1_Cleaned, type="response")
+
+confmatrix <- table(ActualValue=Quant_22RV1_Cleaned$Cell.Type,
+                    PredictedValue = pred_model < 0.5)
+confmatrix
+
+(confmatrix[1,2]+confmatrix[2,1])/sum(confmatrix)*100 # Clustering method. 56.73913
+
+qqnorm(Quant_22RV1_Cleaned$Green.ATF6, pch = 1, frame = FALSE)
+qqline(Quant_22RV1_Cleaned$Green.ATF6, col = "steelblue", lwd = 2)
+
+
+#Outlier Identification
+
+boxplot(Quant_22RV1_Cleaned$Green.ATF6)
+
+boxplot(Quant_22RV1_Cleaned$Red.AR)
+
+#find outlier values
+OutVals = boxplot(Quant_22RV1_Cleaned$Green.ATF6)$out
+
+OutVals
+
+#find outlier index position in vector
+which(Quant_22RV1_Cleaned$Green.ATF6 %in% OutVals)
+
+#Remove outliers from your dataset.
+filtered_x <- Quant_22RV1_Cleaned$Green.ATF6[ !(Quant_22RV1_Cleaned$Green.ATF6 %in% OutVals) ]
+filtered_x2 <- filtered_x[ !(filtered_x %in% OutVals) ]
+filtered_x3 <- filtered_x2[ !(filtered_x2 %in% OutVals) ]
+
+summary(filtered_x)
+summary(filtered_x2)
+summary(filtered_x3)
+
+boxplot(filtered_x)
+boxplot(filtered_x2)
+boxplot(filtered_x3)
+
+boxplot(Quant_22RV1_Cleaned$Red.AR)
+
+#find outlier values
+OutValsY = boxplot(Quant_22RV1_Cleaned$Red.AR)$out
+
+OutValsY
+
+#find outlier index position in vector
+which(Quant_22RV1_Cleaned$Red.AR %in% OutValsY)
+
+#Remove outliers from your dataset.
+filtered_y <- Quant_22RV1_Cleaned$Red.AR[ !(Quant_22RV1_Cleaned$Red.AR %in% OutValsY) ]
+filtered_y2 <- filtered_y[ !(filtered_y %in% OutValsY) ]
+filtered_x3 <- filtered_x2[ !(filtered_x2 %in% OutVals) ]
+
+summary(filtered_y)
+summary(filtered_x2)
+
+boxplot(filtered_y)
+boxplot(filtered_y2)
+
+str(filtered_x3)
+summary(filtered_x3)
+str(df)
+view(filtered_x3)
+
+df.filtered <- data.frame(filtered_x3, filtered_y2)
+
+write.csv(filtered_x3, file ="filtered_x3.csv", row.names=FALSE)
+write.csv(filtered_y2, file ="filtered_y2.csv", row.names=FALSE)
+
+# Bar chart of Distribution of ATF6 and AR
+
+library(ggplot2)
+library(reshape2)            # for melt(...)
+
+gg <- melt(Quant_22RV1_Cleaned,id="Cell.Type")   # df is your original table
+ggplot(gg, aes(x=variable, y=value, fill=Cell.Type)) + 
+  xlab ("Antibody") +
+  ylab ("Intensity") +
+  ggtitle("Distribution of ATF6 and AR") +
+  stat_summary(fun=mean, geom="bar",position=position_dodge(1)) + 
+  scale_color_discrete("Cell.Type") +
+  stat_summary(fun.min=min,fun.max=max,geom="errorbar",
+             color="grey80",position=position_dodge(1), width=.2)
+
+# Correlation
+library(corrplot)
+
+res <- cor(Quant_22RV1_Cleanedvs2)
+
+corrplot(res, type = "upper", order = "hclust", 
+         tl.col = "black", tl.srt = 45)
+
+rcorr(as.matrix(Quant_22RV1_Cleanedvs2), type = c("spearman"))
+
+#             Cell.Type Green.ATF6 Red.AR
+# Cell.Type       1.00      -0.09  -0.07
+# Green.ATF6     -0.09       1.00   0.05
+# Red.AR         -0.07       0.05   1.00
+
+
+
+
+
+```
+
+```{r, echo=FALSE}
+# Alcoholic data set.
+
+# Import data set.
+Alcoholic <- read.csv("/Users/ryangough/Documents/GitHub/dsc520/data/Alcoholic Mice S1P and GCC185.csv", header = TRUE)
+
+# Historgram showing distribution.
+graph <- Alcoholic %>% 
+  gather(category, value)
+
+ggplot(graph, aes(x = value, fill = category)) +
+  geom_histogram(binwidth = 0.5, color = "black")
+
+# Assessing normality of data set 
+shapiro.test(Alcoholic$NonAlcoholic) # TLDR, Not Normal, p-value < 2.2e-16
+shapiro.test(Alcoholic$ModerateAlcoholic) # TLDR, Not Normal, p-value < 2.2e-16
+shapiro.test(Alcoholic$HeavyAlcoholic) # TLDR, Not Normal, p-value < 2.2e-16
+
+#Outlier Identification
+
+boxplot(Alcoholic$NonAlcoholic)
+boxplot(Alcoholic$ModerateAlcoholic)
+boxplot(Alcoholic$HeavyAlcoholic)
+
+#find outlier values for Nonalcoholic
+OutValsNon = boxplot(Alcoholic$NonAlcoholic)$out # First Iternation of NON
+which(Alcoholic$NonAlcoholic %in% OutValsNon) # First Iteration of NON
+filtered_non <- Alcoholic$NonAlcoholic[ !(Alcoholic$NonAlcoholic %in% OutValsNon) ]
+
+OutValsNon2 = boxplot(filtered_non)$out # Second Iternation of NON
+which(filtered_non %in% OutValsNon2) # Second Iteration of NON
+filtered_non2 <- filtered_non[ !(filtered_non %in% OutValsNon2) ]
+
+OutValsNon3 = boxplot(filtered_non2)$out # Third Iternation of NON
+which(filtered_non2 %in% OutValsNon3) # Third Iteration of NON
+filtered_non3 <- filtered_non2[ !(filtered_non2 %in% OutValsNon3) ]
+
+OutValsNon4 = boxplot(filtered_non3)$out # Fourth Iternation of NON
+which(filtered_non3 %in% OutValsNon4) # Fourth Iteration of NON
+filtered_non4 <- filtered_non3[ !(filtered_non3 %in% OutValsNon4) ]
+
+#find outlier index position in vector
+#which(Alcoholic$NonAlcoholic %in% OutValsNon) # First Iteration of NON
+#which(filtered_non %in% OutValsNon2) # Second Iteration of NON
+#which(filtered_non2 %in% OutValsNon3) # Third Iteration of NON
+#which(filtered_non3 %in% OutValsNon4) # Fourth Iteration of NON
+
+#Remove outliers from your dataset.
+#filtered_non <- Alcoholic$NonAlcoholic[ !(Alcoholic$NonAlcoholic %in% OutValsNon) ]
+#filtered_non2 <- filtered_non[ !(filtered_non %in% OutValsNon2) ]
+#filtered_non3 <- filtered_non2[ !(filtered_non2 %in% OutValsNon3) ]
+#filtered_non4 <- filtered_non3[ !(filtered_non3 %in% OutValsNon4) ]
+
+# Validation of outlier removal.
+boxplot(filtered_non)
+boxplot(filtered_non2)
+boxplot(filtered_non3)
+boxplot(filtered_non4) # Completion of outlier removal for Non-Alcoholic
+
+#find outlier values for Moderate Alcoholic
+OutValsMod = boxplot(Alcoholic$ModerateAlcoholic)$out # First Iternation of Mod
+which(Alcoholic$ModerateAlcoholic %in% OutValsMod) # First Iteration of Mod
+filtered_mod <- Alcoholic$ModerateAlcoholic[ !(Alcoholic$ModerateAlcoholic %in% OutValsMod) ]
+
+OutValsmod2 = boxplot(filtered_mod)$out # Second Iternation of Mod
+which(filtered_mod %in% OutValsmod2) # Second Iteration of Mod
+filtered_mod2 <- filtered_mod[ !(filtered_mod %in% OutValsmod2) ]
+
+OutValsmod3 = boxplot(filtered_mod2)$out # Third Iternation of Mod
+which(filtered_mod2 %in% OutValsmod3) # Third Iteration of Mod
+filtered_mod3 <- filtered_mod2[ !(filtered_mod2 %in% OutValsmod3) ]
+
+OutValsmod4 = boxplot(filtered_mod3)$out # Fourth Iternation of Mod
+which(filtered_mod3 %in% OutValsNon4) # Fourth Iteration of NON
+filtered_mod4 <- filtered_mod3[ !(filtered_mod3 %in% OutValsmod4) ]
+
+#find outlier index position in vector
+#which(Alcoholic$ModerateAlcoholic %in% OutValsMod) # First Iteration of Mod
+#which(filtered_mod %in% OutValsmod2) # Second Iteration of Mod
+#which(filtered_mod2 %in% OutValsmod3) # Third Iteration of Mod
+#which(filtered_mod3 %in% OutValsNon4) # Fourth Iteration of NON
+
+#Remove outliers from your dataset.
+#filtered_mod <- Alcoholic$ModerateAlcoholic[ !(Alcoholic$ModerateAlcoholic %in% OutValsMod) ]
+#filtered_mod2 <- filtered_mod[ !(filtered_mod %in% OutValsmod2) ]
+#filtered_mod3 <- filtered_mod2[ !(filtered_mod2 %in% OutValsmod3) ]
+#filtered_mod4 <- filtered_mod3[ !(filtered_mod3 %in% OutValsmod4) ]
+
+# Validation of outlier removal.
+boxplot(filtered_mod)
+boxplot(filtered_mod2)
+boxplot(filtered_mod3)
+boxplot(filtered_mod4) # Completion of outlier removal for Moderate Alcohol
+
+#find outlier values for Heavy Alcoholic
+OutValsHvy = boxplot(Alcoholic$HeavyAlcoholic)$out # First Iternation of Heavy
+which(Alcoholic$HeavyAlcoholic %in% OutValsHvy) # First Iteration of Hvy
+filtered_Hvy <- Alcoholic$HeavyAlcoholic[ !(Alcoholic$HeavyAlcoholic %in% OutValsHvy) ]
+
+OutValsHvy2 = boxplot(filtered_Hvy)$out # Second Iternation of Mod
+which(filtered_Hvy %in% OutValsHvy2) # Second Iteration of Mod
+filtered_Hvy2 <- filtered_Hvy[ !(filtered_Hvy %in% OutValsHvy2) ]
+
+OutValsHvy3 = boxplot(filtered_Hvy2)$out # Third Iternation of Mod
+which(filtered_Hvy2 %in% OutValsHvy3) # Third Iteration of Mod
+filtered_Hvy3 <- filtered_Hvy2[ !(filtered_Hvy2 %in% OutValsHvy3) ]
+
+OutValsHvy4 = boxplot(filtered_Hvy3)$out # Fourth Iternation of Mod
+which(filtered_Hvy3 %in% OutValsHvy4) # Fourth Iteration of NON
+filtered_Hvy4 <- filtered_Hvy3[ !(filtered_Hvy3 %in% OutValsHvy4) ]
+
+OutValsHvy5 = boxplot(filtered_Hvy4)$out # Fourth Iternation of Mod
+which(filtered_Hvy4 %in% OutValsHvy5) # Fourth Iteration of NON
+filtered_Hvy5 <- filtered_Hvy4[ !(filtered_Hvy4 %in% OutValsHvy5) ]
+
+OutValsHvy6 = boxplot(filtered_Hvy5)$out # Fourth Iternation of Mod
+which(filtered_Hvy5 %in% OutValsHvy6) # Fourth Iteration of NON
+filtered_Hvy6 <- filtered_Hvy5[ !(filtered_Hvy5 %in% OutValsHvy6) ]
+
+OutValsHvy7 = boxplot(filtered_Hvy6)$out # Fourth Iternation of Mod
+which(filtered_Hvy6 %in% OutValsHvy7) # Fourth Iteration of NON
+filtered_Hvy7 <- filtered_Hvy6[ !(filtered_Hvy6 %in% OutValsHvy7) ]
+
+#find outlier index position in vector
+#which(Alcoholic$HeavyAlcoholic %in% OutValsHvy) # First Iteration of Hvy
+#which(filtered_Hvy %in% OutValsHvy2) # Second Iteration of Mod
+#which(filtered_Hvy2 %in% OutValsHvy3) # Third Iteration of Mod
+#which(filtered_Hvy3 %in% OutValsHvy4) # Fourth Iteration of NON
+#which(filtered_Hvy4 %in% OutValsHvy5) # Fourth Iteration of NON
+#which(filtered_Hvy5 %in% OutValsHvy6) # Fourth Iteration of NON
+#which(filtered_Hvy6 %in% OutValsHvy7) # Fourth Iteration of NON
+
+#Remove outliers from your dataset.
+#filtered_Hvy <- Alcoholic$HeavyAlcoholic[ !(Alcoholic$HeavyAlcoholic %in% OutValsHvy) ]
+#filtered_Hvy2 <- filtered_Hvy[ !(filtered_Hvy %in% OutValsHvy2) ]
+#filtered_Hvy3 <- filtered_Hvy2[ !(filtered_Hvy2 %in% OutValsHvy3) ]
+#filtered_Hvy4 <- filtered_Hvy3[ !(filtered_Hvy3 %in% OutValsHvy4) ]
+#filtered_Hvy5 <- filtered_Hvy4[ !(filtered_Hvy4 %in% OutValsHvy5) ]
+#filtered_Hvy6 <- filtered_Hvy5[ !(filtered_Hvy5 %in% OutValsHvy6) ]
+#filtered_Hvy7 <- filtered_Hvy6[ !(filtered_Hvy6 %in% OutValsHvy7) ]
+
+# Validation of outlier removal.
+boxplot(filtered_Hvy)
+boxplot(filtered_Hvy2)
+boxplot(filtered_Hvy3)
+boxplot(filtered_Hvy4) 
+boxplot(filtered_Hvy5) 
+boxplot(filtered_Hvy6)
+boxplot(filtered_Hvy7) # Completion of outlier removal for Heavy Alchohol
+
+write.csv(filtered_non4, file ="filtered_Non.csv", row.names=FALSE)
+write.csv(filtered_mod4, file ="filtered_Mod.csv", row.names=FALSE)
+write.csv(filtered_Hvy7, file ="filtered_Hvy.csv", row.names=FALSE)
+
+#KNN of Alcoholic Patients
+
+Alcoholic_filtered <- read.csv("/Users/ryangough/Documents/GitHub/dsc520/data/filtered_alcoholic.csv", header = TRUE)
+
+kruskal.test(Alcoholic_filtered$NonAlcoholic ~ Alcoholic_filtered$ModerateAlcoholic, data = Alcoholic_filtered) # p-value = 0.5044, NonAlcoholic vs. Moderate Alcoholic
+
+kruskal.test(Alcoholic_filtered$NonAlcoholic ~ Alcoholic_filtered$HeavyAlcoholic, data = Alcoholic_filtered) # p-value = 0.5401, NonAlcoholic vs. Heavy Alcoholic
+
+kruskal.test(Alcoholic_filtered$ModerateAlcoholic ~ Alcoholic_filtered$HeavyAlcoholic, data = Alcoholic_filtered) # p-value = 0.4687, Moderate Alcoholic vs, Heavy Alcoholic
+
+# Histogram showing filtered distribution.
+graph1 <- Alcoholic_filtered %>% 
+  gather(category, value)
+
+ggplot(graph1, aes(x = value, fill = category)) +
+  geom_histogram(binwidth = 0.5, color = "black") +
+  xlab("") +
+  ylab("Colocalization of S1P and GCC185") +
+  ggtitle("Distribution of S1P and GCC185 colocalized cells")
+
+```
+
+```{r, echo=FALSE}
+
+BHP <- read.csv("/Users/ryangough/Documents/GitHub/dsc520/data/BHP tissue staining ATF6 and AR.csv", header = TRUE)
+
+# Quantification of BHP patients, stained for Green-ATF6 and Red-AR.
+
+# Scatterplot of ATF6 and AR Distribution of cleaned data. 
+ggplot(BHP, aes(y=Green.ATF6, x=Red.AR)) +
+  geom_point() +
+  ggtitle("ATF6 & AR Distribution")
+
+# Assessing normality of ATF6 and AR. 
+shapiro.test(BHP$Green.ATF6[0:5000]) # TLDR, Not Normal
+shapiro.test(BHP$Red.AR[0:5000]) # TLDR, Not Normal
+
+
+#KNN of ATF6 and AR Distribution of cleaned data
+BHP1 <- read.csv("/Users/ryangough/Documents/GitHub/dsc520/data/BHP tissue staining ATF6 and AR.csv", header = TRUE)
+
+binary_cleaned_BHP1.dat <- sample(1:nrow(BHP1),size=nrow(BHP1)*0.7,replace = FALSE) # Splitting Data
+
+train <- BHP1[binary_cleaned_BHP1.dat,] # Training Data @ 70%
+
+test<- BHP1[-binary_cleaned_BHP1.dat,] # Testing remaining Data at 30%
+
+train.labels <- BHP1[binary_cleaned_BHP1.dat,1]
+
+test.labels  <- BHP1[-binary_cleaned_BHP1.dat,1]
+
+k = 6
+
+model =  knn(train=train, test=test, cl=train.labels, k=k)
+
+
+tab.1 <- table(model, test.labels) # Confusion Matrix
+
+accuracy <- function(x){sum(diag(x)/(sum(rowSums(x)))) * 100} # Function divides the correct predictions by total number of predictions.
+accuracy(tab.1) # KNN method, 62.53968
+
+# Bar chart of Distribution of ATF6 and AR
+
+library(ggplot2)
+library(reshape2)            # for melt(...)
+
+gg <- melt(BHP,id="Patients")   # df is your original table
+ggplot(gg, aes(x=variable, y=value, fill=Patients)) + 
+  xlab ("Antibody") +
+  ylab ("Intensity") +
+  ggtitle("Distribution of ATF6 and AR") +
+  stat_summary(fun=mean, geom="bar",position=position_dodge(1)) + 
+  scale_color_discrete("Patients") +
+  stat_summary(fun.min=min,fun.max=max,geom="errorbar",
+             color="grey80",position=position_dodge(1), width=.2)
+
+# Correlation
+library(corrplot)
+
+res <- cor(BHP1)
+
+corrplot(res, type = "upper", order = "hclust", 
+         tl.col = "black", tl.srt = 45)
+
+rcorr(as.matrix(BHP1), type = c("spearman"))
+
+#             Patients Green.ATF6 Red.AR
+# Patients       1.00       0.32  -0.11
+# Green.ATF6     0.32       1.00   0.58
+# Red.AR        -0.11       0.58   1.00
+
+# n= 6300 
+
+BHPColocalized <- read.csv("/Users/ryangough/Documents/GitHub/dsc520/data/PatientDataColocalized.csv", header = TRUE)
+
+N1 <- kruskal.test(Normal ~ Normal.Adjusted, data = BHPColocalized)# p-value = 0.4824
+N2 <- kruskal.test(Normal ~ PCA, data = BHPColocalized) # p-value = 0.4942
+N3 <- kruskal.test(Normal ~ BHP, data = BHPColocalized) # p-value = 0.4941906
+N4 <- kruskal.test(Normal ~ BHP.HG, data = BHPColocalized)# p-value = 0.4941906
+N5 <- kruskal.test(Normal ~ BHP.LG, data = BHPColocalized)# p-value = 0.4912221	
+
+NA1 <- kruskal.test(Normal.Adjusted ~ PCA, data = BHPColocalized)# p-value = 0.4941906	
+NA2 <- kruskal.test(Normal.Adjusted ~ BHP, data = BHPColocalized)# p-value = 0.4941906	
+NA3 <- kruskal.test(Normal.Adjusted ~ BHP.HG, data = BHPColocalized)# p-value = 0.4941906	
+NA4 <- kruskal.test(Normal.Adjusted ~ BHP.LG, data = BHPColocalized)# p-value = 0.4941906
+
+PCA1 <- kruskal.test(PCA ~ BHP, data = BHPColocalized)# p-value = 0.4941906	
+PCA2 <- kruskal.test(PCA ~ BHP.HG, data = BHPColocalized)# p-value = 0.4941906	
+PCA3 <- kruskal.test(PCA ~ BHP.LG, data = BHPColocalized)# p-value =0.4955187
+
+BHPHG1 <- kruskal.test(BHP.HG ~ BHP, data = BHPColocalized)# p-value = 0.4941906	
+BHPHG2 <- kruskal.test(BHP.HG ~ BHP.LG, data = BHPColocalized)# p-value = 0.4862171	
+
+BHPLG1 <- kruskal.test(BHP.LG ~ BHP, data = BHPColocalized)# p-value =0.4941906	
+BHPLG2 <- kruskal.test(BHP.LG ~ BHP.HG, data = BHPColocalized)# p-value = 0.4941906
+
+Kruskal.df <- data.frame(N1$p.value, N2$p.value, N3$p.value, N4$p.value, N5$p.value, NA1$p.value, NA2$p.value, NA3$p.value, N4$p.value, PCA1$p.value, PCA2$p.value, PCA3$p.value, BHPHG1$p.value, BHPHG2$p.value, BHPLG1$p.value, BHPLG2$p.value)
+
+Kruskal.df
+
+
+```
+
